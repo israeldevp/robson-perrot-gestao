@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Phone, ChevronRight, X, Calendar, Clock, Scissors, CreditCard, AlertTriangle, TrendingUp, Edit2, Save } from 'lucide-react';
 import { Client, Appointment, AppointmentStatus } from '../types';
 
@@ -233,7 +234,6 @@ export const ClientList: React.FC<ClientListProps> = ({ clients, appointments, o
 
             // Use portal if available (browser environment), otherwise render normally (though should always be browser)
             if (typeof document !== 'undefined') {
-              const { createPortal } = require('react-dom');
               return createPortal(modalContent, document.body);
             }
             return modalContent;
