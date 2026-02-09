@@ -42,8 +42,11 @@ const generateHistory = (): Appointment[] => {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setDate(now.getDate() - 180);
 
-  // Loop dia a dia
-  for (let d = new Date(sixMonthsAgo); d <= now; d.setDate(d.getDate() + 1)) {
+  // Loop dia a dia (passado e futuro)
+  const futureDate = new Date();
+  futureDate.setDate(now.getDate() + 20);
+
+  for (let d = new Date(sixMonthsAgo); d <= futureDate; d.setDate(d.getDate() + 1)) {
     // Pular Domingos
     if (d.getDay() === 0) continue;
 
@@ -74,11 +77,23 @@ const generateHistory = (): Appointment[] => {
       const service = services[Math.floor(Math.random() * services.length)];
       const employee = MOCK_EMPLOYEES[i % 2]; // Alterna Robson e Gabriel
 
-      // Se for passado, 95% de chance de estar pago e concluído
+      // Definir status baseado se é passado ou futuro
       const isPast = timestamp < now;
-      const status = isPast 
-        ? (Math.random() > 0.05 ? AppointmentStatus.COMPLETED : AppointmentStatus.NO_SHOW)
-        : AppointmentStatus.SCHEDULED;
+      let status: AppointmentStatus;
+      let isPaid = false;
+      let paymentMethod: PaymentMethod | undefined = undefined;
+
+      if (isPast) {
+        // Lógica para passado (95% concluído)
+        status = Math.random() > 0.05 ? AppointmentStatus.COMPLETED : AppointmentStatus.NO_SHOW;
+        isPaid = status === AppointmentStatus.COMPLETED;
+        paymentMethod = isPaid ? PaymentMethod.PIX : undefined;
+      } else {
+        // Lógica para futuro (Agendado)
+        status = AppointmentStatus.SCHEDULED;
+        isPaid = false;
+        paymentMethod = undefined;
+      }
 
       appointments.push({
         id: `apt-${timestamp.getTime()}-${i}`,
@@ -89,8 +104,8 @@ const generateHistory = (): Appointment[] => {
         timestamp: new Date(timestamp),
         durationMinutes: 30,
         price: service.price,
-        isPaid: status === AppointmentStatus.COMPLETED,
-        paymentMethod: status === AppointmentStatus.COMPLETED ? PaymentMethod.PIX : undefined,
+        isPaid: isPaid,
+        paymentMethod: paymentMethod,
         status: status
       });
     }
