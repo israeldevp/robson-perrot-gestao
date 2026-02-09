@@ -92,8 +92,8 @@ export const ClientList: React.FC<ClientListProps> = ({ clients, appointments, o
 
       {/* Client Detail Modal */}
       {selectedClient && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-brand-onyx/95 backdrop-blur-sm p-0 sm:p-4 transition-opacity animate-in fade-in duration-200">
-          <div className="w-full sm:max-w-xl bg-brand-concrete border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transform transition-transform animate-in slide-in-from-bottom-10">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-brand-onyx/95 backdrop-blur-sm transition-opacity animate-in fade-in duration-200">
+          <div className="w-full sm:w-96 bg-brand-concrete border-t sm:border border-white/10 rounded-t-2xl sm:rounded-xl shadow-2xl transform transition-transform animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 overflow-visible max-h-[90vh] flex flex-col">
             
             {/* Modal Header */}
             <div className="p-6 border-b border-white/5 flex justify-between items-start">
