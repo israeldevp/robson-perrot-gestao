@@ -8,9 +8,10 @@ interface CheckpointModalProps {
   onClose: () => void;
   appointment: Appointment | null;
   onConfirm: (appointmentId: string, finalPrice: number, isPaid: boolean, status: AppointmentStatus, paymentMethod?: PaymentMethod, serviceName?: string) => void;
+  onDelete: (appointment: Appointment) => void;
 }
 
-export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClose, appointment, onConfirm }) => {
+export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClose, appointment, onConfirm, onDelete }) => {
   const [price, setPrice] = useState<string>('');
   const [serviceName, setServiceName] = useState<string>('');
   const [markAsPaid, setMarkAsPaid] = useState<boolean>(false);
@@ -32,9 +33,9 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
   const handleConfirm = () => {
     let status = AppointmentStatus.COMPLETED;
     if (isNoShow) {
-        status = AppointmentStatus.NO_SHOW;
+      status = AppointmentStatus.NO_SHOW;
     }
-    
+
     const finalPaid = isNoShow ? false : markAsPaid;
     const finalPaymentMethod = finalPaid ? (selectedPaymentMethod || PaymentMethod.PIX) : undefined;
 
@@ -43,16 +44,16 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
   };
 
   const toggleNoShow = () => {
-      setIsNoShow(!isNoShow);
-      if (!isNoShow) {
-          setMarkAsPaid(false);
-      }
+    setIsNoShow(!isNoShow);
+    if (!isNoShow) {
+      setMarkAsPaid(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-brand-onyx/95 backdrop-blur-sm transition-opacity animate-in fade-in duration-200">
       <div className="w-full sm:w-96 bg-brand-concrete border-t sm:border border-white/10 rounded-t-2xl sm:rounded-xl shadow-2xl transform transition-transform animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0">
-        
+
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-white/5">
           <div className="flex items-center gap-2">
@@ -66,21 +67,21 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          
+
           {/* Client Block */}
           <div className="flex items-center gap-4">
-             <div className="w-14 h-14 bg-brand-onyx border border-white/10 rounded-full flex items-center justify-center shadow-inner shrink-0">
-                <User className="w-6 h-6 text-brand-gold" />
-             </div>
-             <div className="min-w-0">
-                <h3 className="font-display font-bold text-2xl text-white uppercase tracking-tight leading-none truncate">{appointment.clientName}</h3>
-                <div className="flex flex-col mt-0.5">
-                   <div className="flex items-center gap-1.5">
-                      <Briefcase className="w-2.5 h-2.5 text-brand-gold" />
-                      <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.1em]">Atendido por: {appointment.employeeName}</p>
-                   </div>
+            <div className="w-14 h-14 bg-brand-onyx border border-white/10 rounded-full flex items-center justify-center shadow-inner shrink-0">
+              <User className="w-6 h-6 text-brand-gold" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-display font-bold text-2xl text-white uppercase tracking-tight leading-none truncate">{appointment.clientName}</h3>
+              <div className="flex flex-col mt-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Briefcase className="w-2.5 h-2.5 text-brand-gold" />
+                  <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.1em]">Atendido por: {appointment.employeeName}</p>
                 </div>
-             </div>
+              </div>
+            </div>
           </div>
 
           {/* Service Input */}
@@ -99,7 +100,7 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
 
           {/* Inputs Grid */}
           <div className="grid grid-cols-2 gap-4">
-             {/* Price Input */}
+            {/* Price Input */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Valor (R$)</label>
               <div className="relative group">
@@ -117,38 +118,36 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
             </div>
 
             {/* Time Readonly */}
-             <div className="space-y-2">
+            <div className="space-y-2">
               <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Horário</label>
               <div className="flex items-center gap-2 h-[54px] px-3 bg-brand-onyx rounded-lg border border-white/10 opacity-80">
-                 <Clock className="w-4 h-4 text-brand-muted" />
-                 <span className="text-lg text-brand-text font-display font-bold">
-                   {appointment.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                 </span>
+                <Clock className="w-4 h-4 text-brand-muted" />
+                <span className="text-lg text-brand-text font-display font-bold">
+                  {appointment.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Toggles Section */}
           <div className="space-y-3">
-            
+
             {/* Payment Toggle */}
-            <div 
-                className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-between select-none ${
-                markAsPaid 
-                    ? 'bg-brand-onyx border-brand-gold shadow-[0_4px_14px_0_rgba(212,175,55,0.1)]' 
-                    : 'bg-brand-onyx border-white/5 hover:border-white/10'
+            <div
+              className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-between select-none ${markAsPaid
+                  ? 'bg-brand-onyx border-brand-gold shadow-[0_4px_14px_0_rgba(212,175,55,0.1)]'
+                  : 'bg-brand-onyx border-white/5 hover:border-white/10'
                 } ${isNoShow ? 'opacity-40 pointer-events-none' : ''}`}
-                onClick={() => !isNoShow && setMarkAsPaid(!markAsPaid)}
+              onClick={() => !isNoShow && setMarkAsPaid(!markAsPaid)}
             >
-                <span className={`font-display font-bold text-sm uppercase tracking-wide ${markAsPaid ? 'text-brand-gold' : 'text-brand-muted'}`}>
-                    {markAsPaid ? 'Pagamento Confirmado' : 'Aguardando Pagamento'}
-                </span>
-                
-                <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${
-                    markAsPaid ? 'bg-brand-gold border-brand-gold' : 'border-white/20 bg-black/20'
+              <span className={`font-display font-bold text-sm uppercase tracking-wide ${markAsPaid ? 'text-brand-gold' : 'text-brand-muted'}`}>
+                {markAsPaid ? 'Pagamento Confirmado' : 'Aguardando Pagamento'}
+              </span>
+
+              <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${markAsPaid ? 'bg-brand-gold border-brand-gold' : 'border-white/20 bg-black/20'
                 }`}>
-                    {markAsPaid && <Check className="w-4 h-4 text-brand-onyx" strokeWidth={3} />}
-                </div>
+                {markAsPaid && <Check className="w-4 h-4 text-brand-onyx" strokeWidth={3} />}
+              </div>
             </div>
 
             {/* Payment Methods */}
@@ -164,8 +163,8 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
                     onClick={() => setSelectedPaymentMethod(method.id)}
                     className={`
                       flex flex-col items-center justify-center gap-2 p-3 rounded-lg border transition-all
-                      ${selectedPaymentMethod === method.id 
-                        ? 'bg-brand-gold text-brand-onyx border-brand-gold font-bold shadow-lg' 
+                      ${selectedPaymentMethod === method.id
+                        ? 'bg-brand-gold text-brand-onyx border-brand-gold font-bold shadow-lg'
                         : 'bg-brand-onyx text-brand-muted border-white/10 hover:border-white/20 hover:text-white'
                       }
                     `}
@@ -178,25 +177,23 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
             )}
 
             {/* No Show Toggle */}
-            <div 
-                className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-between select-none ${
-                isNoShow 
-                    ? 'bg-brand-onyx border-brand-muted shadow-inner' 
-                    : 'bg-brand-onyx border-white/5 hover:border-white/10'
+            <div
+              className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-between select-none ${isNoShow
+                  ? 'bg-brand-onyx border-brand-muted shadow-inner'
+                  : 'bg-brand-onyx border-white/5 hover:border-white/10'
                 }`}
-                onClick={toggleNoShow}
+              onClick={toggleNoShow}
             >
-                <div className="flex items-center gap-2">
-                    {isNoShow && <AlertTriangle className="w-4 h-4 text-brand-muted" />}
-                    <span className={`font-display font-bold text-sm uppercase tracking-wide ${isNoShow ? 'text-brand-muted' : 'text-brand-muted/70'}`}>
-                        Não Compareceu
-                    </span>
-                </div>
-                <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${
-                    isNoShow ? 'bg-brand-muted border-brand-muted' : 'border-white/20 bg-black/20'
+              <div className="flex items-center gap-2">
+                {isNoShow && <AlertTriangle className="w-4 h-4 text-brand-muted" />}
+                <span className={`font-display font-bold text-sm uppercase tracking-wide ${isNoShow ? 'text-brand-muted' : 'text-brand-muted/70'}`}>
+                  Não Compareceu
+                </span>
+              </div>
+              <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${isNoShow ? 'bg-brand-muted border-brand-muted' : 'border-white/20 bg-black/20'
                 }`}>
-                    {isNoShow && <X className="w-4 h-4 text-brand-onyx" strokeWidth={3} />}
-                </div>
+                {isNoShow && <X className="w-4 h-4 text-brand-onyx" strokeWidth={3} />}
+              </div>
             </div>
 
           </div>
@@ -205,11 +202,19 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
 
         {/* Footer Actions */}
         <div className="p-6 pt-0 space-y-3">
-          <button 
+          <button
             onClick={handleConfirm}
             className="w-full bg-gold-gradient text-brand-onyx font-display font-black text-sm uppercase tracking-widest py-4 rounded-lg hover:brightness-110 transition-all active:scale-[0.98] shadow-lg shadow-brand-gold/10"
           >
             Salvar Checkpoint
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { onDelete(appointment); onClose(); }}
+            className="w-full bg-brand-onyx border border-red-500/20 text-red-500 font-bold text-[10px] uppercase tracking-widest py-3 rounded-lg hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
+          >
+            <AlertTriangle className="w-3 h-3" /> Excluir Agendamento
           </button>
         </div>
 

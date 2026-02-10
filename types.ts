@@ -47,3 +47,11 @@ export interface DashboardStats {
   pendingPayment: number;
   revenueByEmployee: Record<string, number>;
 }
+
+export interface DeletionLog {
+  id: string;
+  user_email: string;
+  appointment_details: any;
+  reason?: string;
+  deleted_at: string;
+}

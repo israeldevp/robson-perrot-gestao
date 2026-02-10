@@ -1,16 +1,17 @@
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Phone, ChevronRight, X, Calendar, Clock, Scissors, CreditCard, AlertTriangle, TrendingUp, Edit2, Save } from 'lucide-react';
+import { User, Phone, ChevronRight, X, Calendar, Clock, Scissors, CreditCard, AlertTriangle, TrendingUp, Edit2, Save, UserPlus } from 'lucide-react';
 import { Client, Appointment, AppointmentStatus } from '../types';
 
 interface ClientListProps {
   clients: Client[];
   appointments: Appointment[];
   onUpdatePhone: (clientId: string, newPhone: string) => void;
+  onNewClientClick?: () => void;
 }
 
-export const ClientList: React.FC<ClientListProps> = ({ clients, appointments, onUpdatePhone }) => {
+export const ClientList: React.FC<ClientListProps> = ({ clients, appointments, onUpdatePhone, onNewClientClick }) => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [editPhoneValue, setEditPhoneValue] = useState('');
@@ -57,7 +58,17 @@ export const ClientList: React.FC<ClientListProps> = ({ clients, appointments, o
   return (
     <div className="px-6 pt-4 pb-28">
       <div className="flex items-end justify-between mb-8">
-        <h2 className="font-display text-2xl font-black text-white uppercase tracking-tight font-stretch-expanded">Clientes</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="font-display text-2xl font-black text-white uppercase tracking-tight font-stretch-expanded">Clientes</h2>
+          {onNewClientClick && (
+            <button
+              onClick={onNewClientClick}
+              className="flex items-center gap-2 px-3 py-1.5 bg-brand-concreteDark border border-white/5 rounded-lg text-brand-gold text-[10px] font-black uppercase tracking-widest hover:border-brand-gold/30 transition-all"
+            >
+              <UserPlus className="w-3 h-3" /> Novo Cliente
+            </button>
+          )}
+        </div>
         <span className="text-xs font-bold text-brand-muted uppercase tracking-widest border-b border-transparent pb-1">{clients.length} cadastrados</span>
       </div>
 
