@@ -1,27 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Clock, User, AlertTriangle, Banknote, CreditCard, QrCode, Scissors, Briefcase } from 'lucide-react';
-import { Appointment, AppointmentStatus, PaymentMethod } from '../types';
+import { X, Check, Clock, User, AlertTriangle, Banknote, CreditCard, QrCode, Scissors, Briefcase, RefreshCw } from 'lucide-react';
+import { Appointment, AppointmentStatus, PaymentMethod, Employee } from '../types';
 
 interface CheckpointModalProps {
   isOpen: boolean;
   onClose: () => void;
   appointment: Appointment | null;
-  onConfirm: (appointmentId: string, finalPrice: number, isPaid: boolean, status: AppointmentStatus, paymentMethod?: PaymentMethod, serviceName?: string) => void;
+  onConfirm: (appointmentId: string, finalPrice: number, isPaid: boolean, status: AppointmentStatus, paymentMethod?: PaymentMethod, serviceName?: string, employeeName?: string, newTimestamp?: Date) => void;
   onDelete: (appointment: Appointment) => void;
+  employees: Employee[];
 }
 
-export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClose, appointment, onConfirm, onDelete }) => {
+export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClose, appointment, onConfirm, onDelete, employees }) => {
   const [price, setPrice] = useState<string>('');
   const [serviceName, setServiceName] = useState<string>('');
+  const [employeeName, setEmployeeName] = useState<string>('');
+  const [timeString, setTimeString] = useState<string>('');
   const [markAsPaid, setMarkAsPaid] = useState<boolean>(false);
   const [isNoShow, setIsNoShow] = useState<boolean>(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | undefined>(undefined);
 
   useEffect(() => {
     if (appointment) {
-      setPrice(appointment.price.toString());
+      setPrice(appointment.price > 0 ? appointment.price.toString() : '');
       setServiceName(appointment.serviceName);
+      setEmployeeName(appointment.employeeName);
+      setTimeString(appointment.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       setMarkAsPaid(appointment.isPaid);
       setIsNoShow(appointment.status === AppointmentStatus.NO_SHOW);
       setSelectedPaymentMethod(appointment.paymentMethod || PaymentMethod.PIX);
@@ -39,8 +44,26 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
     const finalPaid = isNoShow ? false : markAsPaid;
     const finalPaymentMethod = finalPaid ? (selectedPaymentMethod || PaymentMethod.PIX) : undefined;
 
-    onConfirm(appointment.id, parseFloat(price) || 0, finalPaid, status, finalPaymentMethod, serviceName);
+    // Construct new date object preserving the original date but updating time
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const newTimestamp = new Date(appointment.timestamp);
+    newTimestamp.setHours(hours);
+    newTimestamp.setMinutes(minutes);
+
+    const numericPrice = parseFloat(price);
+    if (isNaN(numericPrice)) {
+      alert('Por favor, informe o valor do serviço.');
+      return;
+    }
+
+    onConfirm(appointment.id, numericPrice, finalPaid, status, finalPaymentMethod, serviceName, employeeName, newTimestamp);
     onClose();
+  };
+
+  const cycleEmployee = () => {
+    const currentIndex = employees.findIndex(e => e.name === employeeName);
+    const nextIndex = (currentIndex + 1) % employees.length;
+    setEmployeeName(employees[nextIndex].name);
   };
 
   const toggleNoShow = () => {
@@ -78,7 +101,10 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
               <div className="flex flex-col mt-0.5">
                 <div className="flex items-center gap-1.5">
                   <Briefcase className="w-2.5 h-2.5 text-brand-gold" />
-                  <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.1em]">Atendido por: {appointment.employeeName}</p>
+                  <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.1em]">Atendido por: {employeeName}</p>
+                  <button onClick={cycleEmployee} className="ml-2 bg-brand-gold/10 hover:bg-brand-gold/20 text-brand-gold p-1 rounded transition-colors" title="Trocar Profissional">
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -112,7 +138,7 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   disabled={isNoShow}
-                  className="w-full bg-brand-onyx border border-white/10 rounded-lg py-3 pl-10 pr-3 text-white font-display font-bold text-xl focus:border-brand-gold focus:ring-0 transition-all placeholder-brand-muted/50 disabled:opacity-50"
+                  className="w-full bg-brand-onyx border border-white/10 rounded-lg py-3 pl-10 pr-3 text-white font-display font-bold text-xl focus:border-brand-gold focus:ring-0 transition-all placeholder-brand-muted/50 disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
             </div>
@@ -120,11 +146,16 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
             {/* Time Readonly */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Horário</label>
-              <div className="flex items-center gap-2 h-[54px] px-3 bg-brand-onyx rounded-lg border border-white/10 opacity-80">
-                <Clock className="w-4 h-4 text-brand-muted" />
-                <span className="text-lg text-brand-text font-display font-bold">
-                  {appointment.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Clock className="w-4 h-4 text-brand-muted" />
+                </div>
+                <input
+                  type="time"
+                  value={timeString}
+                  onChange={(e) => setTimeString(e.target.value)}
+                  className="w-full bg-brand-onyx border border-white/10 rounded-lg py-3 pl-10 pr-3 text-white font-display font-bold text-xl focus:border-brand-gold focus:ring-0 transition-all [&::-webkit-calendar-picker-indicator]:invert"
+                />
               </div>
             </div>
           </div>
@@ -135,8 +166,8 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
             {/* Payment Toggle */}
             <div
               className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-between select-none ${markAsPaid
-                  ? 'bg-brand-onyx border-brand-gold shadow-[0_4px_14px_0_rgba(212,175,55,0.1)]'
-                  : 'bg-brand-onyx border-white/5 hover:border-white/10'
+                ? 'bg-brand-onyx border-brand-gold shadow-[0_4px_14px_0_rgba(212,175,55,0.1)]'
+                : 'bg-brand-onyx border-white/5 hover:border-white/10'
                 } ${isNoShow ? 'opacity-40 pointer-events-none' : ''}`}
               onClick={() => !isNoShow && setMarkAsPaid(!markAsPaid)}
             >
@@ -179,8 +210,8 @@ export const CheckpointModal: React.FC<CheckpointModalProps> = ({ isOpen, onClos
             {/* No Show Toggle */}
             <div
               className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-between select-none ${isNoShow
-                  ? 'bg-brand-onyx border-brand-muted shadow-inner'
-                  : 'bg-brand-onyx border-white/5 hover:border-white/10'
+                ? 'bg-brand-onyx border-brand-muted shadow-inner'
+                : 'bg-brand-onyx border-white/5 hover:border-white/10'
                 }`}
               onClick={toggleNoShow}
             >

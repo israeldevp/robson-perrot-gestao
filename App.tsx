@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from './services/supabase';
 import { Auth } from './components/Auth';
 import { Session } from '@supabase/supabase-js';
-import { Plus, X, UserPlus, Trash2, Check, TrendingUp, Calendar, Users, Briefcase, BarChart3, PieChart, Landmark, UserCheck, Scissors, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, LogIn } from 'lucide-react';
+import { Plus, X, UserPlus, Trash2, Check, TrendingUp, Calendar, Users, Briefcase, BarChart3, PieChart, Landmark, UserCheck, Scissors, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, LogIn, User as UserIcon } from 'lucide-react';
 import { Header } from './components/Header';
 import { SummaryCards } from './components/SummaryCard';
 import { AppointmentList } from './components/AppointmentList';
@@ -73,8 +73,15 @@ const App: React.FC = () => {
     // Fetch Appointments
     const { data: aptData } = await supabase.from('appointments').select('*').order('timestamp', { ascending: false });
     if (aptData) {
-      setAppointments(aptData.map(apt => ({
+      setAppointments(aptData.map((apt: any) => ({
         ...apt,
+        clientId: apt.client_id,
+        clientName: apt.client_name,
+        employeeName: apt.employee_name,
+        serviceName: apt.service_name,
+        durationMinutes: apt.duration_minutes,
+        isPaid: apt.is_paid,
+        paymentMethod: apt.payment_method,
         timestamp: new Date(apt.timestamp)
       })) as Appointment[]);
     }
@@ -170,19 +177,25 @@ const App: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleUpdateAppointment = async (id: string, finalPrice: number, isPaid: boolean, status?: AppointmentStatus, paymentMethod?: PaymentMethod, serviceName?: string) => {
-    const updates = {
+  const handleUpdateAppointment = async (id: string, finalPrice: number, isPaid: boolean, status?: AppointmentStatus, paymentMethod?: PaymentMethod, serviceName?: string, employeeName?: string, newTimestamp?: Date) => {
+    const updates: any = {
       price: finalPrice,
-      isPaid,
+      is_paid: isPaid,
       status: status || AppointmentStatus.SCHEDULED,
       payment_method: paymentMethod,
-      service_name: serviceName
+      service_name: serviceName,
+      employee_name: employeeName
     };
+
+    if (newTimestamp) {
+      updates.timestamp = newTimestamp.toISOString();
+    }
 
     const { error } = await supabase.from('appointments').update(updates).eq('id', id);
 
     if (error) {
-      alert('Erro ao atualizar agendamento');
+      console.error('Error updating appointment:', error);
+      alert(`Erro ao atualizar agendamento: ${error.message}`);
       return;
     }
 
@@ -194,11 +207,13 @@ const App: React.FC = () => {
           isPaid,
           status: status || apt.status,
           paymentMethod: paymentMethod,
-          serviceName: serviceName || apt.serviceName
+          serviceName: serviceName || apt.serviceName,
+          employeeName: employeeName || apt.employeeName,
+          timestamp: newTimestamp || apt.timestamp
         };
       }
       return apt;
-    }));
+    }).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()));
   };
 
   const handleUpdateClientPhone = async (clientId: string, newPhone: string) => {
@@ -301,7 +316,14 @@ const App: React.FC = () => {
 
     const completeApt: Appointment = {
       ...finalApt,
-      timestamp: new Date(finalApt.timestamp)
+      timestamp: new Date(finalApt.timestamp),
+      clientId: finalApt.client_id,
+      clientName: finalApt.client_name,
+      employeeName: finalApt.employee_name,
+      serviceName: finalApt.service_name,
+      durationMinutes: finalApt.duration_minutes,
+      isPaid: finalApt.is_paid,
+      paymentMethod: finalApt.payment_method
     };
 
     setAppointments(prev => [...prev, completeApt].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()));
@@ -360,14 +382,17 @@ const App: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase.from('employees').delete().eq('id', id);
+    // Soft Delete: Mark as inactive instead of deleting
+    const { error } = await supabase.from('employees').update({ active: false }).eq('id', id);
+
     if (error) {
       alert('Erro ao excluir funcionário');
       return;
     }
 
-    setEmployees(prev => prev.filter(emp => emp.id !== id));
-    alert('Funcionário excluído com sucesso.');
+    // Update local state: mark as inactive
+    setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, active: false } : emp));
+    alert('Funcionário removido da equipe. O histórico financeiro foi mantido.');
   };
 
 
@@ -538,6 +563,30 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Ex-Team Section */}
+                {employees.filter(e => e.active === false).length > 0 && (
+                  <div className="mt-8 pt-8 border-t border-white/5 opacity-60 hover:opacity-100 transition-opacity">
+                    <h3 className="font-display font-black text-xs text-brand-muted uppercase tracking-[0.2em] mb-4">Ex-Colaboradores (Histórico)</h3>
+                    <div className="space-y-3">
+                      {employees.filter(e => e.active === false).map(emp => {
+                        const revenue = stats.revenueByEmployee[emp.name] || 0;
+                        return (
+                          <div key={emp.id} className="flex justify-between items-center bg-brand-onyx border border-white/5 p-3 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center grayscale"><UserIcon className="w-4 h-4 text-brand-muted" /></div>
+                              <div>
+                                <p className="text-white font-bold text-xs">{emp.name}</p>
+                                <p className="text-[9px] text-brand-muted uppercase tracking-wider">Inativo</p>
+                              </div>
+                            </div>
+                            <span className="font-mono text-brand-gold font-bold text-xs">R$ {revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -584,7 +633,7 @@ const App: React.FC = () => {
                 <button onClick={handleAddEmployee} className="bg-brand-gold text-brand-onyx w-14 rounded-xl flex items-center justify-center shadow-lg shadow-brand-gold/10"><UserPlus className="w-6 h-6" /></button>
               </div>
               <div className="space-y-4">
-                {employees.map(emp => (
+                {employees.filter(emp => emp.active !== false).map(emp => (
                   <div key={emp.id} className="bg-brand-concreteDark border border-white/5 p-5 rounded-2xl flex items-center justify-between group">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-brand-onyx flex items-center justify-center border border-white/10"><Check className="w-5 h-5 text-brand-gold" /></div>
@@ -647,8 +696,8 @@ const App: React.FC = () => {
           <button onClick={() => setIsNewAppointmentModalOpen(true)} className="w-16 h-16 bg-gold-gradient text-brand-onyx rounded-2xl flex items-center justify-center shadow-[0_10px_30px_rgba(212,175,55,0.3)] border border-brand-gold/50"><Plus className="w-9 h-9" strokeWidth={3} /></button>
         </div>
       )}
-      <CheckpointModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} appointment={selectedAppointment} onConfirm={handleUpdateAppointment} onDelete={handleDeleteAppointment} />
-      <NewAppointmentModal isOpen={isNewAppointmentModalOpen} onClose={() => setIsNewAppointmentModalOpen(false)} onConfirm={handleCreateAppointment} clients={clients} employees={employees} />
+      <CheckpointModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} appointment={selectedAppointment} onConfirm={handleUpdateAppointment} onDelete={handleDeleteAppointment} employees={employees.filter(e => e.active !== false)} />
+      <NewAppointmentModal isOpen={isNewAppointmentModalOpen} onClose={() => setIsNewAppointmentModalOpen(false)} onConfirm={handleCreateAppointment} clients={clients} employees={employees.filter(e => e.active !== false)} />
       <NewClientModal isOpen={isNewClientModalOpen} onClose={() => setIsNewClientModalOpen(false)} onConfirm={handleCreateClient} />
       {isMenuOpen && (
         <div className="fixed inset-0 z-50 bg-brand-onyx/98 backdrop-blur-sm flex flex-col p-6 animate-in fade-in duration-200">

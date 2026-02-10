@@ -15,6 +15,7 @@ export enum PaymentMethod {
 export interface Employee {
   id: string;
   name: string;
+  active?: boolean;
 }
 
 export interface Client {
