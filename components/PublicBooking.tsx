@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { Service, Employee } from '../types';
-import { Calendar, Clock, User, Phone, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Calendar, Clock, User, Phone, Check, ChevronLeft, ChevronRight, Loader2, Home } from 'lucide-react';
 
 type Step = 'service' | 'employee' | 'date' | 'time' | 'details' | 'success';
 
@@ -140,7 +140,11 @@ export const PublicBooking: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedService || !selectedTime || !customerName || !customerPhone) return;
+
+        if (!selectedService || !selectedTime || !customerName || !customerPhone) {
+            alert('Por favor, preencha todos os campos obrigatórios.');
+            return;
+        }
 
         setLoading(true);
 
@@ -558,23 +562,25 @@ export const PublicBooking: React.FC = () => {
     );
 
 
-    const renderSuccessStep = () => (
-        <div className="text-center space-y-6 py-10 animate-in zoom-in duration-300">
-            <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto border border-green-500/50">
-                <Check className="w-10 h-10" />
+    const handleGoHome = () => {
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-brand-onyx flex flex-col font-sans">
+                <header className="p-6 text-center border-b border-white/5 bg-brand-concreteDark">
+                    <h1 className="font-display font-black text-xl text-white uppercase tracking-wider">Barbearia App</h1>
+                </header>
+                <main className="flex-1 flex flex-col items-center justify-center p-6">
+                    <Loader2 className="w-16 h-16 text-brand-gold animate-spin mb-6" />
+                    <h2 className="text-xl font-bold text-white animate-pulse">Confirmando seu agendamento...</h2>
+                    <p className="text-brand-muted text-sm mt-2">Por favor, aguarde.</p>
+                </main>
             </div>
-            <div className="space-y-2">
-                <h2 className="text-2xl font-black text-white uppercase">Agendado!</h2>
-                <p className="text-brand-muted">Te esperamos no dia {selectedDate.toLocaleDateString()} às {selectedTime}.</p>
-            </div>
-            <button
-                onClick={() => window.location.reload()}
-                className="text-brand-gold font-bold text-sm uppercase tracking-wider hover:text-white transition-colors"
-            >
-                Fazer outro agendamento
-            </button>
-        </div>
-    );
+        );
+    }
 
     return (
         <div className="min-h-screen bg-brand-onyx flex flex-col font-sans">
@@ -597,10 +603,7 @@ export const PublicBooking: React.FC = () => {
                     </button>
                 ) : step === 'service' ? (
                     <button
-                        onClick={() => {
-                            window.history.pushState({}, '', '/');
-                            window.dispatchEvent(new PopStateEvent('popstate'));
-                        }}
+                        onClick={handleGoHome}
                         className="mb-6 text-brand-muted hover:text-white flex items-center gap-2 text-sm font-bold uppercase tracking-wider"
                     >
                         <ChevronLeft className="w-4 h-4" /> Voltar ao Início
@@ -612,10 +615,57 @@ export const PublicBooking: React.FC = () => {
                 {step === 'date' && renderDateStep()}
                 {step === 'time' && renderTimeStep()}
                 {step === 'details' && renderDetailsStep()}
-                {step === 'success' && renderSuccessStep()}
+                {step === 'success' && selectedTime && (
+                    <SuccessStep
+                        date={selectedDate}
+                        time={selectedTime}
+                        onGoHome={handleGoHome}
+                    />
+                )}
             </main>
+        </div>
+    );
+};
 
+// Extracted Component to fix Hooks Rule violation
+const SuccessStep = ({ date, time, onGoHome }: { date: Date, time: string, onGoHome: () => void }) => {
+    const [countdown, setCountdown] = useState(5);
 
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCountdown((prev) => prev - 1);
+        }, 1000);
+
+        const redirect = setTimeout(() => {
+            onGoHome();
+        }, 5000);
+
+        return () => {
+            clearInterval(timer);
+            clearTimeout(redirect);
+        };
+    }, [onGoHome]);
+
+    return (
+        <div className="text-center space-y-6 py-10 animate-in zoom-in duration-300 relative">
+            <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto border border-green-500/50">
+                <Check className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+                <h2 className="text-2xl font-black text-white uppercase">Agendado com Sucesso!</h2>
+                <p className="text-brand-muted">Te esperamos no dia {date.toLocaleDateString()} às {time}.</p>
+                <p className="text-brand-muted text-xs mt-4">Retornando ao início em {countdown}s...</p>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-4">
+                <button
+                    onClick={onGoHome}
+                    className="w-full bg-brand-concreteDark border border-white/10 text-white font-bold py-3 rounded-xl hover:bg-white/5 transition-colors uppercase tracking-wider text-sm flex items-center justify-center gap-2"
+                >
+                    <Home className="w-4 h-4" />
+                    Voltar ao Início Agora
+                </button>
+            </div>
         </div>
     );
 };
