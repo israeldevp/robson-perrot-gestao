@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Crown, Bell } from 'lucide-react';
+import { Menu, Bell } from 'lucide-react';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -12,18 +12,14 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, onNotificationClick
     <header className="flex items-center justify-between px-6 py-6 bg-brand-onyx sticky top-0 z-20 border-b border-white/5 backdrop-blur-md bg-opacity-90">
 
       {/* Brand Identity - Minimalist Geometric */}
-      <div className="flex flex-col">
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Crown className="w-6 h-6 text-brand-gold" strokeWidth={2.5} />
-            {/* Geometric Accent underneath */}
-            <div className="absolute -bottom-1 left-0 w-full h-[2px] bg-brand-gold"></div>
-          </div>
+      <div className="flex items-center gap-3">
+        <img src="/logo-barbearia2.png" alt="Barbearia Robson" className="w-16 h-16 object-contain" />
+        <div className="flex flex-col justify-center -mt-1">
           <h1 className="font-display font-black text-xl tracking-tighter uppercase text-white font-stretch-expanded leading-none">
             Barbearia<span className="text-brand-gold">App</span>
           </h1>
+          <p className="text-[10px] text-brand-muted tracking-[0.2em] uppercase font-bold leading-none mt-1">Gestão</p>
         </div>
-        <p className="text-[10px] text-brand-muted tracking-[0.2em] uppercase font-bold mt-1 ml-8">Gestão</p>
       </div>
 
       {/* Navigation Actions */}
