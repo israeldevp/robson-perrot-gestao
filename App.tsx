@@ -17,6 +17,8 @@ type ViewState = 'dashboard' | 'agenda' | 'clientes' | 'financeiro' | 'configura
 import { PublicBooking } from './components/PublicBooking';
 
 const App: React.FC = () => {
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+
   // Simple routing check
   const [isPublicBooking, setIsPublicBooking] = useState(window.location.pathname === '/agendar');
 
@@ -137,6 +139,15 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchInitialData();
   }, [session]);
+
+  // Check for admin access automatically
+  useEffect(() => {
+    if (session?.user?.email === adminEmail) {
+      setIsConfigAuthenticated(true);
+    } else {
+      setIsConfigAuthenticated(false);
+    }
+  }, [session, adminEmail]);
 
   const handleResolveNotification = async (notificationId: string, action: 'UPDATE' | 'IGNORE', data: any) => {
     // 1. If UPDATE, update client name
@@ -449,21 +460,12 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    const password = prompt('Para excluir este funcionário, digite sua senha de acesso:');
-    if (!password) return;
-
-    // Verify password via Supabase Auth re-login simulation or similar logic
-    // Since we don't have a direct "verify password" without re-logging in, 
-    // we can use the current session's email and the provided password.
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: session?.user.email || '',
-      password: password
-    });
-
-    if (authError) {
-      alert('Senha incorreta! Não foi possível excluir o funcionário.');
+    if (session?.user.email !== adminEmail) {
+      alert('Apenas o administrador pode excluir funcionários.');
       return;
     }
+
+    if (!confirm('Tem certeza que deseja remover este funcionário da equipe?')) return;
 
     // Soft Delete: Mark as inactive instead of deleting
     const { error } = await supabase.from('employees').update({ active: false }).eq('id', id);
@@ -481,26 +483,20 @@ const App: React.FC = () => {
 
 
   const handleDeleteAppointment = async (appointment: Appointment) => {
-    // 1. If it's a paid/completed appointment, require password
+    // 1. If it's a paid/completed appointment, require admin
     if (appointment.status === AppointmentStatus.COMPLETED) {
-      const password = prompt('Para excluir um agendamento já realizado, digite sua senha:');
-      if (!password) return;
-
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: session?.user.email || '',
-        password: password
-      });
-
-      if (authError) {
-        alert('Senha incorreta! Não foi possível excluir o agendamento.');
+      if (session?.user.email !== adminEmail) {
+        alert('Apenas o administrador pode excluir agendamentos concluídos.');
         return;
       }
+
+      const reason = prompt('Motivo da exclusão (opcional):');
 
       // Log the deletion
       const logEntry = {
         user_email: session?.user.email,
         appointment_details: appointment,
-        reason: 'Exclusão manual de agendamento realizado'
+        reason: reason || 'Exclusão manual de agendamento realizado'
       };
 
       const { error: logError } = await supabase.from('deletion_logs').insert(logEntry);
@@ -794,6 +790,8 @@ const App: React.FC = () => {
               <div className="text-center space-y-2 mb-10">
                 <h2 className="font-display text-2xl font-black text-white uppercase tracking-tight">Área Restrita</h2>
                 <p className="text-brand-muted text-[10px] font-bold uppercase tracking-widest">Acesso Administrativo</p>
+                <p className="text-white text-sm mt-4">Você precisa estar logado com o e-mail de administrador ({adminEmail}) para acessar.</p>
+                <p className="text-brand-muted text-xs">Atual: {session?.user.email || 'Não logado'}</p>
               </div>
               {/* Legacy config login removed in favor of Supabase Auth, but keeping internal state for now if needed, 
                      though the entire app is now protected. We can simplify this later. 
