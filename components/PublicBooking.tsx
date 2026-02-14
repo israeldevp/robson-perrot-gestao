@@ -22,7 +22,7 @@ export const PublicBooking: React.FC = () => {
     const [customerPhone, setCustomerPhone] = useState('');
 
     // Availability
-    const [occupiedSlots, setOccupiedSlots] = useState<{ timestamp: string, duration: number }[]>([]);
+    const [dayAppointments, setDayAppointments] = useState<any[]>([]);
 
     useEffect(() => {
         fetchInitialData();
@@ -65,17 +65,15 @@ export const PublicBooking: React.FC = () => {
             endOfDay.setHours(23, 59, 59, 999);
 
             const { data } = await supabase
-                .from('public_appointment_slots')
-                .select('timestamp, duration_minutes')
+                .from('appointments')
+                .select('timestamp, duration_minutes, employee_name')
                 .gte('timestamp', startOfDay.toISOString())
                 .lte('timestamp', endOfDay.toISOString())
-                .neq('status', 'CANCELED');
+                .neq('status', 'CANCELED')
+                .neq('status', 'NO_SHOW');
 
             if (data) {
-                setOccupiedSlots(data.map((item: any) => ({
-                    timestamp: item.timestamp,
-                    duration: item.duration_minutes
-                })));
+                setDayAppointments(data);
             }
         } catch (error) {
             console.error('Error fetching availability:', error);
@@ -114,21 +112,24 @@ export const PublicBooking: React.FC = () => {
                 const slotDate = new Date(selectedDate);
                 slotDate.setHours(hour, minute, 0, 0);
 
-                const isOccupied = occupiedSlots.some(slot => {
-                    const bookedStart = new Date(slot.timestamp);
-                    const bookedEnd = new Date(bookedStart.getTime() + slot.duration * 60000);
+                const serviceDuration = selectedService?.duration_minutes || 30;
+                const newSlotEnd = new Date(slotDate.getTime() + serviceDuration * 60000);
 
-                    const serviceDuration = selectedService?.duration_minutes || 30;
-                    const newSlotEnd = new Date(slotDate.getTime() + serviceDuration * 60000);
+                // Find employees who are BUSY during this slot
+                const busyEmployeeNames = dayAppointments
+                    .filter(apt => {
+                        const bookedStart = new Date(apt.timestamp);
+                        const bookedEnd = new Date(bookedStart.getTime() + apt.duration_minutes * 60000);
+                        // Overlap check
+                        return (slotDate < bookedEnd && newSlotEnd > bookedStart);
+                    })
+                    .map(apt => apt.employee_name);
 
-                    // Check if the NEW slot overlaps with EXISTING booking
-                    // Standard overlap check: (StartA < EndB) and (EndA > StartB)
-                    return (
-                        slotDate < bookedEnd && newSlotEnd > bookedStart
-                    );
-                });
+                // Find employees who are FREE
+                const freeEmployees = employees.filter(emp => !busyEmployeeNames.includes(emp.name));
 
-                if (!isOccupied) {
+                // If at least one employee is free, the slot is available
+                if (freeEmployees.length > 0) {
                     slots.push(timeString);
                 }
             }
@@ -231,14 +232,54 @@ export const PublicBooking: React.FC = () => {
 
             if (!clientId) throw new Error('Failed to resolve Client ID');
 
-            // 2. Construct timestamp
-            const [hours, minutes] = selectedTime.split(':').map(Number);
-            const timestamp = new Date(selectedDate);
-            timestamp.setHours(hours, minutes, 0, 0);
+            // 3. Employee Assignment & Validation
+            let finalEmployeeName = selectedEmployee ? selectedEmployee.name : '';
 
-            // 3. Employee Assignment
-            const finalEmployee = selectedEmployee ? selectedEmployee.name :
-                (employees.length > 0 ? employees[Math.floor(Math.random() * employees.length)].name : 'A definir');
+            // Construct timestamp objects
+            const [hours, minutes] = selectedTime.split(':').map(Number);
+            const bookingForDate = new Date(selectedDate);
+            bookingForDate.setHours(hours, minutes, 0, 0);
+            const bookingIso = bookingForDate.toISOString();
+
+            const serviceDuration = selectedService.duration_minutes;
+            const bookingEnd = new Date(bookingForDate.getTime() + serviceDuration * 60000);
+
+            // Fetch FRESH availability for this slot to prevent race conditions
+            const { data: conflicts } = await supabase
+                .from('appointments')
+                .select('id, employee_name, timestamp, duration_minutes')
+                .neq('status', 'CANCELED')
+                .neq('status', 'NO_SHOW')
+                .gte('timestamp', new Date(bookingForDate.getTime() - 24 * 60 * 60 * 1000).toISOString()) // look broadly then filter
+                .lte('timestamp', new Date(bookingForDate.getTime() + 24 * 60 * 60 * 1000).toISOString());
+
+            // If "Any" selected, find who is free NOW
+            if (!selectedEmployee) {
+                const busyEmployees = (conflicts || []).filter(apt => {
+                    const aptStart = new Date(apt.timestamp);
+                    const aptEnd = new Date(aptStart.getTime() + apt.duration_minutes * 60000);
+                    return (bookingForDate < aptEnd && bookingEnd > aptStart);
+                }).map(a => a.employee_name);
+
+                const realTimeAvailable = employees.filter(e => !busyEmployees.includes(e.name));
+
+                if (realTimeAvailable.length === 0) {
+                    throw new Error('Desculpe, este horário acabou de ser preenchido.');
+                }
+                finalEmployeeName = realTimeAvailable[Math.floor(Math.random() * realTimeAvailable.length)].name;
+            } else {
+                // If specific employee, check if they are still free
+                const isBusy = (conflicts || []).some(apt => {
+                    if (apt.employee_name !== finalEmployeeName) return false;
+                    const aptStart = new Date(apt.timestamp);
+                    const aptEnd = new Date(aptStart.getTime() + apt.duration_minutes * 60000);
+                    return (bookingForDate < aptEnd && bookingEnd > aptStart);
+                });
+
+                if (isBusy) {
+                    throw new Error(`O profissional ${finalEmployeeName} não está mais disponível neste horário.`);
+                }
+            }
 
             // 4. Create Appointment
             // 4. Create Appointment
@@ -252,8 +293,8 @@ export const PublicBooking: React.FC = () => {
                     service_name: selectedService.name,
                     price: selectedService.price,
                     duration_minutes: selectedService.duration_minutes,
-                    timestamp: timestamp.toISOString(),
-                    employee_name: finalEmployee,
+                    timestamp: bookingIso,
+                    employee_name: finalEmployeeName,
                     status: 'SCHEDULED',
                     is_paid: false
                 })
@@ -270,8 +311,8 @@ export const PublicBooking: React.FC = () => {
                     clientName: customerName,
                     phone: customerPhone,
                     serviceName: selectedService.name,
-                    timestamp: timestamp.toISOString(),
-                    employeeName: finalEmployee,
+                    timestamp: bookingIso,
+                    employeeName: finalEmployeeName,
                     appointmentId: finalApt?.id // Assuming insert returns data, let's fix the insert above to return it
                 },
                 read: false
@@ -372,7 +413,7 @@ export const PublicBooking: React.FC = () => {
                     {services.map(service => (
                         <button
                             key={service.id}
-                            onClick={() => { setSelectedService(service); setStep('employee'); }}
+                            onClick={() => { setSelectedService(service); setStep('date'); }}
                             className="w-full text-left p-4 rounded-xl bg-brand-concreteDark border border-white/5 hover:border-brand-gold/50 hover:bg-white/5 transition-all group"
                         >
                             <div className="flex justify-between items-center">
@@ -387,30 +428,57 @@ export const PublicBooking: React.FC = () => {
         </div>
     );
 
-    const renderEmployeeStep = () => (
-        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <h2 className="text-xl font-bold text-white mb-6">Escolha um Profissional</h2>
-            <div className="grid gap-3">
-                <button
-                    onClick={() => { setSelectedEmployee(null); setStep('date'); }}
-                    className="w-full text-left p-4 rounded-xl bg-brand-concreteDark border border-white/5 hover:border-brand-gold/50 hover:bg-white/5 transition-all group flex items-center gap-4"
-                >
-                    <div className="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold">?</div>
-                    <span className="font-bold text-white group-hover:text-brand-gold transition-colors">Qualquer Profissional</span>
-                </button>
-                {employees.map(emp => (
+    const renderEmployeeStep = () => {
+        if (!selectedTime || !selectedService) return null;
+
+        const [hours, minutes] = selectedTime.split(':').map(Number);
+        const slotDate = new Date(selectedDate);
+        slotDate.setHours(hours, minutes, 0, 0);
+        const serviceDuration = selectedService.duration_minutes;
+        const newSlotEnd = new Date(slotDate.getTime() + serviceDuration * 60000);
+
+        const availableEmployees = employees.filter(emp => {
+            const isBusy = dayAppointments.some(apt => {
+                if (apt.employee_name !== emp.name) return false;
+                const bookedStart = new Date(apt.timestamp);
+                const bookedEnd = new Date(bookedStart.getTime() + apt.duration_minutes * 60000);
+                return (slotDate < bookedEnd && newSlotEnd > bookedStart);
+            });
+            return !isBusy;
+        });
+
+        return (
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                <h2 className="text-xl font-bold text-white mb-6">Escolha um Profissional</h2>
+                <div className="grid gap-3">
                     <button
-                        key={emp.id}
-                        onClick={() => { setSelectedEmployee(emp); setStep('date'); }}
+                        onClick={() => { setSelectedEmployee(null); setStep('details'); }}
                         className="w-full text-left p-4 rounded-xl bg-brand-concreteDark border border-white/5 hover:border-brand-gold/50 hover:bg-white/5 transition-all group flex items-center gap-4"
                     >
-                        <div className="w-10 h-10 rounded-full bg-brand-onyx border border-white/10 flex items-center justify-center text-xs font-bold text-brand-muted">{emp.name.substring(0, 2).toUpperCase()}</div>
-                        <span className="font-bold text-white group-hover:text-brand-gold transition-colors">{emp.name}</span>
+                        <div className="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold">?</div>
+                        <div>
+                            <span className="font-bold text-white group-hover:text-brand-gold transition-colors block">Qualquer Profissional</span>
+                            <span className="text-xs text-brand-muted">Escolheremos um disponível para você</span>
+                        </div>
                     </button>
-                ))}
+                    {availableEmployees.length === 0 ? (
+                        <p className="text-brand-muted text-center py-4">Nenhum profissional disponível especificamente (erro inesperado).</p>
+                    ) : (
+                        availableEmployees.map(emp => (
+                            <button
+                                key={emp.id}
+                                onClick={() => { setSelectedEmployee(emp); setStep('details'); }}
+                                className="w-full text-left p-4 rounded-xl bg-brand-concreteDark border border-white/5 hover:border-brand-gold/50 hover:bg-white/5 transition-all group flex items-center gap-4"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-brand-onyx border border-white/10 flex items-center justify-center text-xs font-bold text-brand-muted">{emp.name.substring(0, 2).toUpperCase()}</div>
+                                <span className="font-bold text-white group-hover:text-brand-gold transition-colors">{emp.name}</span>
+                            </button>
+                        ))
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderDateStep = () => (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -479,7 +547,7 @@ export const PublicBooking: React.FC = () => {
                         {slots.map(time => (
                             <button
                                 key={time}
-                                onClick={() => { setSelectedTime(time); setStep('details'); }}
+                                onClick={() => { setSelectedTime(time); setStep('employee'); }}
                                 className="p-3 rounded-lg bg-brand-concreteDark border border-white/5 text-white hover:bg-brand-gold hover:text-brand-onyx transition-colors font-mono text-sm"
                             >
                                 {time}
@@ -608,10 +676,11 @@ export const PublicBooking: React.FC = () => {
                 {step !== 'service' && step !== 'success' ? (
                     <button
                         onClick={() => {
-                            if (step === 'employee') setStep('service');
-                            if (step === 'date') setStep('employee');
+                            // New Order: service -> date -> time -> employee -> details
+                            if (step === 'date') setStep('service');
                             if (step === 'time') setStep('date');
-                            if (step === 'details') setStep('time');
+                            if (step === 'employee') setStep('time');
+                            if (step === 'details') setStep('employee');
                         }}
                         className="mb-6 text-brand-muted hover:text-white flex items-center gap-2 text-sm font-bold uppercase tracking-wider"
                     >
@@ -627,9 +696,9 @@ export const PublicBooking: React.FC = () => {
                 ) : null}
 
                 {step === 'service' && renderServiceStep()}
-                {step === 'employee' && renderEmployeeStep()}
                 {step === 'date' && renderDateStep()}
                 {step === 'time' && renderTimeStep()}
+                {step === 'employee' && renderEmployeeStep()}
                 {step === 'details' && renderDetailsStep()}
                 {step === 'success' && selectedTime && (
                     <SuccessStep
