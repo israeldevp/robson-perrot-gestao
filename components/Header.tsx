@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, onNotificationClick
 
         {/* Notification Bell */}
         <button onClick={onNotificationClick} className="relative group cursor-pointer w-10 h-10 rounded-lg bg-brand-concrete flex items-center justify-center border border-white/5 group-hover:border-brand-gold/50 transition-colors">
-          <Bell className="w-5 h-5 text-brand-text group-hover:text-brand-gold transition-colors" />
+          <Bell className={`w-5 h-5 transition-colors ${notificationCount > 0 ? 'text-brand-gold animate-pulse' : 'text-brand-text group-hover:text-brand-gold'}`} />
           {notificationCount > 0 && (
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-brand-onyx">
               {notificationCount}

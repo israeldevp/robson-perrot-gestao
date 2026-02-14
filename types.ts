@@ -70,13 +70,17 @@ export interface DeletionLog {
 
 export interface AdminNotification {
   id: string;
-  type: 'DUPLICATE_CLIENT_NAME';
+  type: 'DUPLICATE_CLIENT_NAME' | 'NEW_APPOINTMENT';
   data: {
     clientId: string;
-    oldName: string;
-    newName: string;
+    oldName?: string;
+    newName?: string;
     appointmentId?: string;
-    phone: string;
+    phone?: string;
+    clientName?: string;
+    serviceName?: string;
+    timestamp?: string;
+    employeeName?: string;
   };
   read: boolean;
   created_at: string;

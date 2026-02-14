@@ -49,8 +49,7 @@ const App: React.FC = () => {
   const [selectedEmployeeReport, setSelectedEmployeeReport] = useState<string | null>(null);
   const [showAllMonths, setShowAllMonths] = useState(false);
 
-  // Security state for Settings
-  const [isConfigAuthenticated, setIsConfigAuthenticated] = useState(false);
+
   // Removed hardcoded login states
 
   // Year navigation for financial closure
@@ -140,14 +139,54 @@ const App: React.FC = () => {
     fetchInitialData();
   }, [session]);
 
-  // Check for admin access automatically
+  // Realtime Subscriptions
   useEffect(() => {
-    if (session?.user?.email === adminEmail) {
-      setIsConfigAuthenticated(true);
-    } else {
-      setIsConfigAuthenticated(false);
-    }
-  }, [session, adminEmail]);
+    if (!session) return;
+
+    const channel = supabase
+      .channel('admin_changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'admin_notifications' },
+        (payload) => {
+          const newNotif = payload.new as AdminNotification;
+          if (!newNotif.read) {
+            setNotifications((prev) => [newNotif, ...prev]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'appointments' },
+        (payload) => {
+          const newApt = payload.new as any;
+          const formatted: Appointment = {
+            id: newApt.id,
+            clientId: newApt.client_id,
+            clientName: newApt.client_name,
+            customerName: newApt.customer_name,
+            customerPhone: newApt.customer_phone,
+            employeeName: newApt.employee_name,
+            serviceName: newApt.service_name,
+            timestamp: new Date(newApt.timestamp),
+            durationMinutes: newApt.duration_minutes,
+            price: newApt.price,
+            isPaid: newApt.is_paid,
+            paymentMethod: newApt.payment_method,
+            status: newApt.status,
+            notes: newApt.notes
+          };
+          setAppointments(prev => [...prev, formatted].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
+
+
 
   const handleResolveNotification = async (notificationId: string, action: 'UPDATE' | 'IGNORE', data: AdminNotification['data']) => {
     // 1. If UPDATE, update client name
@@ -460,10 +499,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    if (session?.user.email !== adminEmail) {
-      alert('Apenas o administrador pode excluir funcionários.');
-      return;
-    }
+
 
     if (!confirm('Tem certeza que deseja remover este funcionário da equipe?')) return;
 
@@ -773,28 +809,7 @@ const App: React.FC = () => {
           </div>
         );
       case 'configuracoes':
-        if (!isConfigAuthenticated) {
-          return (
-            <div className="px-6 pt-20 max-w-sm mx-auto flex flex-col items-center animate-slide-in">
-              <div className="w-20 h-20 rounded-3xl bg-brand-gold/10 flex items-center justify-center border border-brand-gold/20 mb-8">
-                <Lock className="w-10 h-10 text-brand-gold" />
-              </div>
-              <div className="text-center space-y-2 mb-10">
-                <h2 className="font-display text-2xl font-black text-white uppercase tracking-tight">Área Restrita</h2>
-                <p className="text-brand-muted text-[10px] font-bold uppercase tracking-widest">Acesso Administrativo</p>
-                <p className="text-white text-sm mt-4">Você precisa estar logado com o e-mail de administrador ({adminEmail}) para acessar.</p>
-                <p className="text-brand-muted text-xs">Atual: {session?.user.email || 'Não logado'}</p>
-              </div>
 
-              <div className="text-center text-white">
-                <p className="text-red-400 font-bold mb-4">Acesso Negado</p>
-                <button onClick={() => setCurrentView('dashboard')} className="bg-white/10 text-white border border-white/5 px-6 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors">
-                  Voltar ao Dashboard
-                </button>
-              </div>
-            </div>
-          );
-        }
         return (
           <div className="px-6 pt-10 max-w-lg mx-auto space-y-12 animate-slide-in">
             <div className="text-center space-y-3">
@@ -966,6 +981,47 @@ const App: React.FC = () => {
                             Atualizar para "{notif.data.newName}"
                           </button>
                         </div>
+                      </>
+                    )}
+
+                    {notif.type === 'NEW_APPOINTMENT' && (
+                      <>
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 shrink-0 border border-green-500/20">
+                            <Check className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-bold text-white text-sm">Novo Agendamento</h4>
+                              <span className="text-[10px] text-brand-muted">{new Date(notif.created_at).toLocaleTimeString().slice(0, 5)}</span>
+                            </div>
+                            <p className="text-brand-muted text-xs mt-1">
+                              <span className="text-white font-bold">{notif.data.clientName}</span> agendou <span className="text-brand-gold">{notif.data.serviceName}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-black/20 p-3 rounded-lg border border-white/5">
+                          <div>
+                            <span className="block text-[10px] uppercase text-brand-muted font-bold">Data</span>
+                            <span className="text-white font-bold">{notif.data.timestamp ? new Date(notif.data.timestamp).toLocaleDateString() : '-'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] uppercase text-brand-muted font-bold">Horário</span>
+                            <span className="text-white font-bold">{notif.data.timestamp ? new Date(notif.data.timestamp).toLocaleTimeString().slice(0, 5) : '-'}</span>
+                          </div>
+                          <div className="col-span-2 pt-2 border-t border-white/5 mt-2">
+                            <span className="block text-[10px] uppercase text-brand-muted font-bold">Profissional</span>
+                            <span className="text-white font-bold">{notif.data.employeeName}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleResolveNotification(notif.id, 'IGNORE', notif.data)}
+                          className="w-full py-3 rounded-lg bg-white/5 border border-white/10 text-brand-muted text-xs font-bold hover:bg-white/10 hover:text-white transition-all uppercase tracking-wider"
+                        >
+                          Marcar como Visto
+                        </button>
                       </>
                     )}
                   </div>

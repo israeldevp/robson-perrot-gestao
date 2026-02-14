@@ -241,7 +241,8 @@ export const PublicBooking: React.FC = () => {
                 (employees.length > 0 ? employees[Math.floor(Math.random() * employees.length)].name : 'A definir');
 
             // 4. Create Appointment
-            const { error } = await supabase
+            // 4. Create Appointment
+            const { data: finalApt, error } = await supabase
                 .from('appointments')
                 .insert({
                     client_id: clientId, // Linked!
@@ -255,9 +256,26 @@ export const PublicBooking: React.FC = () => {
                     employee_name: finalEmployee,
                     status: 'SCHEDULED',
                     is_paid: false
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
+
+            // Create notification for admin
+            await supabase.from('admin_notifications').insert({
+                type: 'NEW_APPOINTMENT',
+                data: {
+                    clientId: clientId,
+                    clientName: customerName,
+                    phone: customerPhone,
+                    serviceName: selectedService.name,
+                    timestamp: timestamp.toISOString(),
+                    employeeName: finalEmployee,
+                    appointmentId: finalApt?.id // Assuming insert returns data, let's fix the insert above to return it
+                },
+                read: false
+            });
 
             setStep('success');
         } catch (error) {
