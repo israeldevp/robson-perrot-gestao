@@ -12,13 +12,13 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, onNotificationClick
     <header className="flex items-center justify-between px-6 py-6 bg-brand-onyx sticky top-0 z-20 border-b border-white/5 backdrop-blur-md bg-opacity-90">
 
       {/* Brand Identity - Minimalist Geometric */}
-      <div className="flex items-center gap-3">
-        <img src="/logo-barbearia2.png" alt="Barbearia Robson" className="w-16 h-16 object-contain" />
+      <div className="flex items-center gap-2 sm:gap-3">
+        <img src="/logo-barbearia2.png" alt="Barbearia Robson" className="w-12 h-12 sm:w-16 sm:h-16 object-contain" />
         <div className="flex flex-col justify-center -mt-1">
-          <h1 className="font-display font-black text-xl tracking-tighter uppercase text-white font-stretch-expanded leading-none">
+          <h1 className="font-display font-black text-sm sm:text-xl tracking-tighter uppercase text-white font-stretch-expanded leading-none">
             Barbearia<span className="text-brand-gold">App</span>
           </h1>
-          <p className="text-[10px] text-brand-muted tracking-[0.2em] uppercase font-bold leading-none mt-1">Gestão</p>
+          <p className="text-[8px] sm:text-[10px] text-brand-muted tracking-[0.2em] uppercase font-bold leading-none mt-0.5 sm:mt-1">Gestão</p>
         </div>
       </div>
 
