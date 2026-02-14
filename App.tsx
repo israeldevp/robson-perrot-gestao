@@ -10,7 +10,7 @@ import { ClientList } from './components/ClientList';
 import { NewClientModal } from './components/NewClientModal';
 import { CheckpointModal } from './components/CheckpointModal';
 import { NewAppointmentModal } from './components/NewAppointmentModal';
-import { Appointment, DashboardStats, AppointmentStatus, PaymentMethod, Client, Employee, DeletionLog } from './types';
+import { Appointment, DashboardStats, AppointmentStatus, PaymentMethod, Client, Employee, DeletionLog, AdminNotification } from './types';
 
 type ViewState = 'dashboard' | 'agenda' | 'clientes' | 'financeiro' | 'configuracoes';
 
@@ -51,9 +51,7 @@ const App: React.FC = () => {
 
   // Security state for Settings
   const [isConfigAuthenticated, setIsConfigAuthenticated] = useState(false);
-  const [loginUser, setLoginUser] = useState('');
-  const [loginPass, setLoginPass] = useState('');
-  const [loginError, setLoginError] = useState(false);
+  // Removed hardcoded login states
 
   // Year navigation for financial closure
   const [financialYear, setFinancialYear] = useState(new Date().getFullYear());
@@ -63,7 +61,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
 
   // Notifications
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
 
   useEffect(() => {
@@ -110,7 +108,8 @@ const App: React.FC = () => {
     })) : [];
 
     if (processedAppointments.length > 0) {
-      setAppointments(processedAppointments.map((apt: any) => ({
+      // Cast the processed data to Appointment[] after ensuring shape
+      const formattedAppointments: Appointment[] = processedAppointments.map((apt: any) => ({
         ...apt,
         clientId: apt.client_id,
         clientName: apt.client_name,
@@ -120,7 +119,8 @@ const App: React.FC = () => {
         isPaid: apt.is_paid,
         paymentMethod: apt.payment_method,
         timestamp: new Date(apt.timestamp)
-      })) as Appointment[]);
+      }));
+      setAppointments(formattedAppointments);
     }
 
     // Fetch Deletion Logs
@@ -149,7 +149,7 @@ const App: React.FC = () => {
     }
   }, [session, adminEmail]);
 
-  const handleResolveNotification = async (notificationId: string, action: 'UPDATE' | 'IGNORE', data: any) => {
+  const handleResolveNotification = async (notificationId: string, action: 'UPDATE' | 'IGNORE', data: AdminNotification['data']) => {
     // 1. If UPDATE, update client name
     if (action === 'UPDATE') {
       const { error } = await supabase
@@ -562,15 +562,7 @@ const App: React.FC = () => {
     setIsMenuOpen(false);
   };
 
-  const handleConfigLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loginUser === 'admin' && loginPass === 'admin') {
-      setIsConfigAuthenticated(true);
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-    }
-  };
+
 
   const renderContent = () => {
     switch (currentView) {
@@ -793,16 +785,11 @@ const App: React.FC = () => {
                 <p className="text-white text-sm mt-4">Você precisa estar logado com o e-mail de administrador ({adminEmail}) para acessar.</p>
                 <p className="text-brand-muted text-xs">Atual: {session?.user.email || 'Não logado'}</p>
               </div>
-              {/* Legacy config login removed in favor of Supabase Auth, but keeping internal state for now if needed, 
-                     though the entire app is now protected. We can simplify this later. 
-                     For now, since we are already authenticated via Supabase to get here, 
-                     we might want to just show the config or require a second checks.
-                     Global Auth is implemented, so we can probably skip this internal check or auto-set it.
-                  */}
+
               <div className="text-center text-white">
-                <p>Você está logado como {session?.user.email}</p>
-                <button onClick={() => setIsConfigAuthenticated(true)} className="mt-4 bg-brand-gold text-brand-onyx px-4 py-2 rounded-lg font-bold">
-                  Acessar Configurações
+                <p className="text-red-400 font-bold mb-4">Acesso Negado</p>
+                <button onClick={() => setCurrentView('dashboard')} className="bg-white/10 text-white border border-white/5 px-6 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors">
+                  Voltar ao Dashboard
                 </button>
               </div>
             </div>
@@ -817,7 +804,7 @@ const App: React.FC = () => {
             <div className="space-y-8">
               <div className="flex items-center justify-between border-l-4 border-brand-gold pl-4">
                 <h3 className="font-display font-black text-sm text-white uppercase tracking-widest">Gestão de Equipe</h3>
-                <button onClick={() => { setIsConfigAuthenticated(false); setLoginPass(''); }} className="p-2 bg-brand-onyx border border-white/5 rounded-lg text-[9px] font-black text-brand-muted uppercase flex items-center gap-2"><Lock className="w-3 h-3" /> Logout</button>
+                <button onClick={() => supabase.auth.signOut()} className="p-2 bg-brand-onyx border border-white/5 rounded-lg text-[9px] font-black text-brand-muted uppercase flex items-center gap-2"><Lock className="w-3 h-3" /> Logout</button>
               </div>
               <div className="flex gap-3">
                 <input type="text" placeholder="Nome do Funcionário" value={newEmployeeName} onChange={(e) => setNewEmployeeName(e.target.value)} className="flex-1 bg-brand-onyx border border-white/10 rounded-xl px-5 py-4 text-white text-sm" />
