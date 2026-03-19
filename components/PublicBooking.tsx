@@ -282,7 +282,6 @@ export const PublicBooking: React.FC = () => {
             }
 
             // 4. Create Appointment
-            // 4. Create Appointment
             const { data: finalApt, error } = await supabase
                 .from('appointments')
                 .insert({
